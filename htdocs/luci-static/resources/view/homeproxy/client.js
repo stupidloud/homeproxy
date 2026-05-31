@@ -1095,7 +1095,7 @@ return view.extend({
 			delete this.keylist;
 			delete this.vallist;
 			uci.sections(data[0], 'dns_rule', (res) => {
-				if (res.enabled === '1' && res.rule_type !== 'logical')
+				if (res.rule_type !== 'logical')
 					this.value(res['.name'], res.label);
 			});
 			return this.super('load', section_id);

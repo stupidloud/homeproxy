@@ -538,8 +538,21 @@ if (!isEmpty(main_node)) {
 	});
 
 	/* DNS rules */
+	let logical_sub_rules = {};
+	uci.foreach(uciconfig, ucidnsrule, (cfg) => {
+		if (cfg.rule_type === 'logical') {
+			let refs = cfg.logical_rules || [];
+			for (let name in refs)
+				if (!isEmpty(name))
+					logical_sub_rules[name] = true;
+		}
+	});
+
 	uci.foreach(uciconfig, ucidnsrule, (cfg) => {
 		if (cfg.enabled !== '1')
+			return;
+
+		if (logical_sub_rules[cfg['.name']])
 			return;
 
 		if (cfg.rule_type === 'logical') {
@@ -574,6 +587,7 @@ if (!isEmpty(main_node)) {
 					user: sub_cfg.user,
 					rule_set: get_ruleset(sub_cfg.rule_set),
 					rule_set_ip_cidr_match_source: strToBool(sub_cfg.rule_set_ip_cidr_match_source),
+					rule_set_ip_cidr_accept_empty: strToBool(sub_cfg.rule_set_ip_cidr_accept_empty),
 					invert: strToBool(sub_cfg.invert),
 					outbound: get_outbound(sub_cfg.outbound)
 				});
@@ -588,7 +602,13 @@ if (!isEmpty(main_node)) {
 				strategy: cfg.domain_strategy,
 				disable_cache: strToBool(cfg.dns_disable_cache),
 				rewrite_ttl: strToInt(cfg.rewrite_ttl),
-				client_subnet: cfg.client_subnet
+				client_subnet: cfg.client_subnet,
+				method: cfg.reject_method,
+				no_drop: strToBool(cfg.reject_no_drop),
+				rcode: cfg.predefined_rcode,
+				answer: cfg.predefined_answer,
+				ns: cfg.predefined_ns,
+				extra: cfg.predefined_extra
 			});
 		} else {
 			push(config.dns.rules, {
@@ -614,6 +634,7 @@ if (!isEmpty(main_node)) {
 				user: cfg.user,
 				rule_set: get_ruleset(cfg.rule_set),
 				rule_set_ip_cidr_match_source: strToBool(cfg.rule_set_ip_cidr_match_source),
+				rule_set_ip_cidr_accept_empty: strToBool(cfg.rule_set_ip_cidr_accept_empty),
 				invert: strToBool(cfg.invert),
 				outbound: get_outbound(cfg.outbound),
 				action: cfg.action,
