@@ -542,44 +542,94 @@ if (!isEmpty(main_node)) {
 		if (cfg.enabled !== '1')
 			return;
 
-		push(config.dns.rules, {
-			ip_version: strToInt(cfg.ip_version),
-			query_type: parse_dnsquery(cfg.query_type),
-			network: cfg.network,
-			protocol: cfg.protocol,
-			domain: cfg.domain,
-			domain_suffix: cfg.domain_suffix,
-			domain_keyword: cfg.domain_keyword,
-			domain_regex: cfg.domain_regex,
-			port: parse_port(cfg.port),
-			port_range: cfg.port_range,
-			source_ip_cidr: cfg.source_ip_cidr,
-			source_ip_is_private: strToBool(cfg.source_ip_is_private),
-			ip_cidr: cfg.ip_cidr,
-			ip_is_private: strToBool(cfg.ip_is_private),
-			source_port: parse_port(cfg.source_port),
-			source_port_range: cfg.source_port_range,
-			process_name: cfg.process_name,
-			process_path: cfg.process_path,
-			process_path_regex: cfg.process_path_regex,
-			user: cfg.user,
-			rule_set: get_ruleset(cfg.rule_set),
-			rule_set_ip_cidr_match_source: strToBool(cfg.rule_set_ip_cidr_match_source),
-			invert: strToBool(cfg.invert),
-			outbound: get_outbound(cfg.outbound),
-			action: cfg.action,
-			server: get_resolver(cfg.server),
-			strategy: cfg.domain_strategy,
-			disable_cache: strToBool(cfg.dns_disable_cache),
-			rewrite_ttl: strToInt(cfg.rewrite_ttl),
-			client_subnet: cfg.client_subnet,
-			method: cfg.reject_method,
-			no_drop: strToBool(cfg.reject_no_drop),
-			rcode: cfg.predefined_rcode,
-			answer: cfg.predefined_answer,
-			ns: cfg.predefined_ns,
-			extra: cfg.predefined_extra
-		});
+		if (cfg.rule_type === 'logical') {
+			let sub_rules = [];
+			let logical_rules = cfg.logical_rules || [];
+			for (let name in logical_rules) {
+				if (isEmpty(name))
+					continue;
+				let sub_cfg = uci.get_all(uciconfig, name) || {};
+				if (sub_cfg.enabled !== '1')
+					continue;
+				push(sub_rules, {
+					ip_version: strToInt(sub_cfg.ip_version),
+					query_type: parse_dnsquery(sub_cfg.query_type),
+					network: sub_cfg.network,
+					protocol: sub_cfg.protocol,
+					domain: sub_cfg.domain,
+					domain_suffix: sub_cfg.domain_suffix,
+					domain_keyword: sub_cfg.domain_keyword,
+					domain_regex: sub_cfg.domain_regex,
+					port: parse_port(sub_cfg.port),
+					port_range: sub_cfg.port_range,
+					source_ip_cidr: sub_cfg.source_ip_cidr,
+					source_ip_is_private: strToBool(sub_cfg.source_ip_is_private),
+					ip_cidr: sub_cfg.ip_cidr,
+					ip_is_private: strToBool(sub_cfg.ip_is_private),
+					source_port: parse_port(sub_cfg.source_port),
+					source_port_range: sub_cfg.source_port_range,
+					process_name: sub_cfg.process_name,
+					process_path: sub_cfg.process_path,
+					process_path_regex: sub_cfg.process_path_regex,
+					user: sub_cfg.user,
+					rule_set: get_ruleset(sub_cfg.rule_set),
+					rule_set_ip_cidr_match_source: strToBool(sub_cfg.rule_set_ip_cidr_match_source),
+					invert: strToBool(sub_cfg.invert),
+					outbound: get_outbound(sub_cfg.outbound)
+				});
+			}
+			push(config.dns.rules, {
+				type: 'logical',
+				mode: cfg.logical_mode || 'and',
+				rules: sub_rules,
+				invert: strToBool(cfg.invert),
+				action: cfg.action,
+				server: get_resolver(cfg.server),
+				strategy: cfg.domain_strategy,
+				disable_cache: strToBool(cfg.dns_disable_cache),
+				rewrite_ttl: strToInt(cfg.rewrite_ttl),
+				client_subnet: cfg.client_subnet
+			});
+		} else {
+			push(config.dns.rules, {
+				ip_version: strToInt(cfg.ip_version),
+				query_type: parse_dnsquery(cfg.query_type),
+				network: cfg.network,
+				protocol: cfg.protocol,
+				domain: cfg.domain,
+				domain_suffix: cfg.domain_suffix,
+				domain_keyword: cfg.domain_keyword,
+				domain_regex: cfg.domain_regex,
+				port: parse_port(cfg.port),
+				port_range: cfg.port_range,
+				source_ip_cidr: cfg.source_ip_cidr,
+				source_ip_is_private: strToBool(cfg.source_ip_is_private),
+				ip_cidr: cfg.ip_cidr,
+				ip_is_private: strToBool(cfg.ip_is_private),
+				source_port: parse_port(cfg.source_port),
+				source_port_range: cfg.source_port_range,
+				process_name: cfg.process_name,
+				process_path: cfg.process_path,
+				process_path_regex: cfg.process_path_regex,
+				user: cfg.user,
+				rule_set: get_ruleset(cfg.rule_set),
+				rule_set_ip_cidr_match_source: strToBool(cfg.rule_set_ip_cidr_match_source),
+				invert: strToBool(cfg.invert),
+				outbound: get_outbound(cfg.outbound),
+				action: cfg.action,
+				server: get_resolver(cfg.server),
+				strategy: cfg.domain_strategy,
+				disable_cache: strToBool(cfg.dns_disable_cache),
+				rewrite_ttl: strToInt(cfg.rewrite_ttl),
+				client_subnet: cfg.client_subnet,
+				method: cfg.reject_method,
+				no_drop: strToBool(cfg.reject_no_drop),
+				rcode: cfg.predefined_rcode,
+				answer: cfg.predefined_answer,
+				ns: cfg.predefined_ns,
+				extra: cfg.predefined_extra
+			});
+		}
 	});
 
 	if (isEmpty(config.dns.rules))
