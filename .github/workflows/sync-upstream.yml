@@ -1,0 +1,119 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to sync'
+        required: false
+        default: 'master'
+        type: string
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          git remote remove upstream 2>/dev/null || true
+          git remote add upstream https://github.com/immortalwrt/homeproxy.git
+          git fetch upstream
+
+      - name: Determine target branch
+        id: branch
+        run: |
+          if [ -n "${{ github.event.inputs.branch }}" ]; then
+            echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_OUTPUT
+          else
+            echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for upstream updates
+        id: check
+        run: |
+          UPSTREAM_BRANCH="upstream/${{ steps.branch.outputs.BRANCH }}"
+          if git merge-base --is-ancestor "$UPSTREAM_BRANCH" HEAD; then
+            echo "UPSTREAM_AHEAD=false" >> $GITHUB_OUTPUT
+            echo "Already up to date with $UPSTREAM_BRANCH"
+          else
+            echo "UPSTREAM_AHEAD=true" >> $GITHUB_OUTPUT
+            echo "Upstream $UPSTREAM_BRANCH has new commits"
+          fi
+
+      - name: Merge upstream changes
+        if: steps.check.outputs.UPSTREAM_AHEAD == 'true'
+        id: merge
+        continue-on-error: true
+        run: |
+          UPSTREAM_BRANCH="upstream/${{ steps.branch.outputs.BRANCH }}"
+          git merge "$UPSTREAM_BRANCH" --no-edit --no-ff
+
+      - name: Rebase on merge conflict
+        if: |
+          steps.check.outputs.UPSTREAM_AHEAD == 'true' &&
+          steps.merge.outcome == 'failure'
+        id: rebase
+        continue-on-error: true
+        run: |
+          UPSTREAM_BRANCH="upstream/${{ steps.branch.outputs.BRANCH }}"
+          git rebase "$UPSTREAM_BRANCH"
+
+      - name: Push merged changes
+        if: |
+          steps.check.outputs.UPSTREAM_AHEAD == 'true' &&
+          (steps.merge.outcome == 'success' || steps.rebase.outcome == 'success')
+        run: |
+          git push origin HEAD:${{ steps.branch.outputs.BRANCH }}
+
+      - name: Create issue on conflict
+        if: |
+          steps.check.outputs.UPSTREAM_AHEAD == 'true' &&
+          steps.merge.outcome == 'failure' &&
+          steps.rebase.outcome == 'failure'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const branch = '${{ steps.branch.outputs.BRANCH }}';
+            const repo = context.repo.repo;
+            const owner = context.repo.owner;
+            const title = `[Sync Upstream] Merge conflict on ${branch}`;
+            const body = `## Upstream Sync Conflict\n\n` +
+              `The automated sync from \`immortalwrt/homeproxy\` to \`${owner}/${repo}\` ` +
+              `on branch \`${branch}\` encountered a merge conflict.\n\n` +
+              `**Action required:** Please resolve the conflict manually.\n\n` +
+              `- Upstream: https://github.com/immortalwrt/homeproxy\n` +
+              `- This repo: https://github.com/${owner}/${repo}\n\n` +
+              `Triggered by: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            
+            // Check if an open issue with the same title already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              labels: 'sync-upstream',
+              per_page: 10
+            });
+            
+            const exists = issues.data.some(issue => issue.title === title);
+            if (!exists) {
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body,
+                labels: ['sync-upstream', 'help wanted']
+              });
+            }
