@@ -1072,21 +1072,39 @@ return view.extend({
 		so.rmempty = false;
 		so.editable = true;
 
-		so = ss.taboption('field_other', form.ListValue, 'mode', _('Mode'),
-			_('The default rule uses the following matching logic:<br/>' +
-			'<code>(domain || domain_suffix || domain_keyword || domain_regex)</code> &&<br/>' +
-			'<code>(port || port_range)</code> &&<br/>' +
-			'<code>(source_ip_cidr || source_ip_is_private)</code> &&<br/>' +
-			'<code>(source_port || source_port_range)</code> &&<br/>' +
-			'<code>other fields</code>.<br/>' +
-			'Additionally, included rule sets can be considered merged rather than as a single rule sub-item.'));
+		so = ss.taboption('field_other', form.ListValue, 'rule_type', _('Rule type'),
+			_('Default rule uses flat matching fields.<br/>' +
+			'Logical rule combines multiple sub-rules with AND/OR mode.'));
 		so.value('default', _('Default'));
+		so.value('logical', _('Logical'));
 		so.default = 'default';
 		so.rmempty = false;
-		so.readonly = true;
+		so.modalonly = true;
+
+		so = ss.taboption('field_other', form.ListValue, 'logical_mode', _('Logical mode'),
+			_('Combine sub-rules using logical AND or OR.'));
+		so.value('and', _('AND'));
+		so.value('or', _('OR'));
+		so.default = 'and';
+		so.depends('rule_type', 'logical');
+		so.modalonly = true;
+
+		so = ss.taboption('field_other', hp.CBIStaticList, 'logical_rules', _('Sub-rules'),
+			_('Select DNS rules used as sub-rules for logical matching.'));
+		so.load = function(section_id) {
+			delete this.keylist;
+			delete this.vallist;
+			uci.sections(data[0], 'dns_rule', (res) => {
+				if (res.enabled === '1' && res.rule_type !== 'logical')
+					this.value(res['.name'], res.label);
+			});
+			return this.super('load', section_id);
+		}
+		so.depends('rule_type', 'logical');
 		so.modalonly = true;
 
 		so = ss.taboption('field_other', form.ListValue, 'ip_version', _('IP version'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.value('4', _('IPv4'));
 		so.value('6', _('IPv6'));
 		so.value('', _('Both'));
@@ -1094,15 +1112,18 @@ return view.extend({
 
 		so = ss.taboption('field_other', form.DynamicList, 'query_type', _('Query type'),
 			_('Match query type.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('field_other', form.ListValue, 'network', _('Network'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.value('tcp', _('TCP'));
 		so.value('udp', _('UDP'));
 		so.value('', _('Both'));
 
 		so = ss.taboption('field_other', form.MultiValue, 'protocol', _('Protocol'),
 			_('Sniffed protocol, see <a target="_blank" href="https://sing-box.sagernet.org/configuration/route/sniff/">Sniff</a> for details.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.value('bittorrent', _('BitTorrent'));
 		so.value('dtls', _('DTLS'));
 		so.value('http', _('HTTP'));
@@ -1114,10 +1135,12 @@ return view.extend({
 
 		so = ss.taboption('field_other', form.DynamicList, 'user', _('User'),
 			_('Match user name.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('field_other', hp.CBIStaticList, 'rule_set', _('Rule set'),
 			_('Match rule set.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.load = function(section_id) {
 			delete this.keylist;
 			delete this.vallist;
@@ -1133,10 +1156,12 @@ return view.extend({
 
 		so = ss.taboption('field_other', form.Flag, 'rule_set_ip_cidr_match_source', _('Rule set IP CIDR as source IP'),
 			_('Make IP CIDR in rule sets match the source IP.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('field_other', form.Flag, 'rule_set_ip_cidr_accept_empty', _('Accept empty query response'),
 			_('Make IP CIDR in rule-sets accept empty query response.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('field_other', form.Flag, 'invert', _('Invert'),
@@ -1241,68 +1266,83 @@ return view.extend({
 
 		so = ss.taboption('field_host', form.DynamicList, 'domain', _('Domain name'),
 			_('Match full domain.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.datatype = 'hostname';
 		so.modalonly = true;
 
 		so = ss.taboption('field_host', form.DynamicList, 'domain_suffix', _('Domain suffix'),
 			_('Match domain suffix.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('field_host', form.DynamicList, 'domain_keyword', _('Domain keyword'),
 			_('Match domain using keyword.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('field_host', form.DynamicList, 'domain_regex', _('Domain regex'),
 			_('Match domain using regular expression.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('field_host', form.DynamicList, 'source_ip_cidr', _('Source IP CIDR'),
 			_('Match source IP CIDR.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.datatype = 'or(cidr, ipaddr)';
 		so.modalonly = true;
 
 		so = ss.taboption('field_host', form.Flag, 'source_ip_is_private', _('Match private source IP'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('field_host', form.DynamicList, 'ip_cidr', _('IP CIDR'),
 			_('Match IP CIDR with query response. Current rule will be skipped if not match.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.datatype = 'or(cidr, ipaddr)';
 		so.modalonly = true;
 
 		so = ss.taboption('field_host', form.Flag, 'ip_is_private', _('Match private IP'),
 			_('Match private IP with query response.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('field_port', form.DynamicList, 'source_port', _('Source port'),
 			_('Match source port.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.datatype = 'port';
 		so.modalonly = true;
 
 		so = ss.taboption('field_port', form.DynamicList, 'source_port_range', _('Source port range'),
 			_('Match source port range. Format as START:/:END/START:END.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.validate = hp.validatePortRange;
 		so.modalonly = true;
 
 		so = ss.taboption('field_port', form.DynamicList, 'port', _('Port'),
 			_('Match port.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.datatype = 'port';
 		so.modalonly = true;
 
 		so = ss.taboption('field_port', form.DynamicList, 'port_range', _('Port range'),
 			_('Match port range. Format as START:/:END/START:END.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.validate = hp.validatePortRange;
 		so.modalonly = true;
 
 		so = ss.taboption('fields_process', form.DynamicList, 'process_name', _('Process name'),
 			_('Match process name.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('fields_process', form.DynamicList, 'process_path', _('Process path'),
 			_('Match process path.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 
 		so = ss.taboption('fields_process', form.DynamicList, 'process_path_regex', _('Process path (regex)'),
 			_('Match process path using regular expression.'));
+		so.depends({'rule_type': 'logical', '!reverse': true});
 		so.modalonly = true;
 		/* DNS rules end */
 		/* Custom routing settings end */
