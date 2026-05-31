@@ -124,7 +124,7 @@ uci commit homeproxy
 - `rule_set` 等 list 类型字段必须用 `uci add_list`，`uci set` 不生效
 - 自定义模式 `default_domain_resolver` 行为略有不同（`action: resolve` vs `action: route`），日常无感
 - **带 `!reverse` 的 depends** 语法：在 `dns_rule` logical 模式中隐藏匹配字段、显示动作字段
-- **自定义模式默认全局代理**：nftables 层无 bypass 逻辑，所有流量兜底重定向到 sing-box。`route.final` 决定了未匹配流量的最终出站——设为 `direct-out` 则未匹配流量直连，保持 `rnode_main` 则为全局代理。
+- **自定义模式默认全局代理**：nftables 层无 bypass 逻辑，所有流量兜底重定向到 sing-box。等效大陆白名单需额外开启 `bypass_cn_traffic='1'`，恢复国内 IP nftables 直连。
 
 ---
 
@@ -252,18 +252,20 @@ curl https://example.com/ --resolve example.com:443:1.2.3.4 -sk  # SNI=域名 �
 - 直连源站的请求返回 404
 - 可用它快速判断请求走了 Cloudflare（`colo=XXX`）还是直连源站（404）
 
-### 12. 自定义模式 `route.final` = 默认兜底出站
+### 12. 自定义模式默认全局代理
 
-**现象：** 切换到自定义模式后，SSH、局域网流量等本该直连的流量也走了代理。
+**现象：** 切换到自定义模式后，SSH、局域网流量等本该直连的国内 IP 流量也走了代理。
 
-**原因：** `firewall_post.ut:312-370` 的 nftables 链中，非自定义模式有 gfwlist/大陆白名单 bypass 逻辑，但自定义模式这些分支全部跳过，最终 line 369 兜底 `goto homeproxy_redirect_proxy_port`——所有流量进入 sing-box。
+**原因：** `firewall_post.ut:312-370` 的 nftables 链在自定义模式跳过所有 bypass 分支，最终 line 369 兜底 `goto homeproxy_redirect_proxy_port`——所有 TCP 流量进入 sing-box。
 
-**解决：** 将 `route.final`（即 `default_outbound`）设为 `direct-out`：
+**解决：** 开启 `bypass_cn_traffic`，恢复 nftables 层面国内 IP 直连：
 
 ```bash
-uci set homeproxy.routing.default_outbound='direct-out'
+uci set homeproxy.routing.bypass_cn_traffic='1'
 uci commit homeproxy
 /etc/init.d/homeproxy restart
 ```
+
+这会让 nftables 链生成 `ip daddr @homeproxy_mainland_addr_v4 counter return` 规则，国内 IP 在入口层直连，不进 sing-box。
 
 未匹配路由规则的流量直连，有明确规则（如特定域名 → VLESS + override_address）的仍然走代理。
