@@ -11,100 +11,98 @@
 ### 步骤
 
 ```bash
+uci batch <<EOF
 # 1. 切换路由模式 + 基础参数
-uci set homeproxy.config.routing_mode='custom'
-uci set homeproxy.routing.sniff_override='0'        # 关闭 sniff 目标覆盖
-uci set homeproxy.routing.default_outbound='rnode_main'
-uci set homeproxy.routing.default_outbound_dns='default-dns'
-uci set homeproxy.dns.default_server='dns_main'
+set homeproxy.config.routing_mode='custom'
+set homeproxy.routing.sniff_override='0'
+set homeproxy.routing.default_outbound='rnode_main'
+set homeproxy.routing.default_outbound_dns='default-dns'
+set homeproxy.dns.default_server='dns_main'
 
 # 2. DNS 服务器（main-dns 代理解析 + china-dns 国内解析）
-uci set homeproxy.dns_main=dns_server
-uci set homeproxy.dns_main.enabled='1'
-uci set homeproxy.dns_main.label='Main DNS'
-uci set homeproxy.dns_main.type='tcp'
-uci set homeproxy.dns_main.server='1.1.1.1'
-uci set homeproxy.dns_main.address_resolver='default-dns'
-uci set homeproxy.dns_main.outbound='rnode_main'
+set homeproxy.dns_main=dns_server
+set homeproxy.dns_main.enabled='1'
+set homeproxy.dns_main.label='Main DNS'
+set homeproxy.dns_main.type='tcp'
+set homeproxy.dns_main.server='1.1.1.1'
+set homeproxy.dns_main.address_resolver='default-dns'
+set homeproxy.dns_main.outbound='rnode_main'
 
-uci set homeproxy.dns_china=dns_server
-uci set homeproxy.dns_china.enabled='1'
-uci set homeproxy.dns_china.label='China DNS'
-uci set homeproxy.dns_china.type='udp'
-uci set homeproxy.dns_china.server='119.29.29.29'
-uci set homeproxy.dns_china.address_resolver='default-dns'
-uci set homeproxy.dns_china.address_strategy='prefer_ipv6'
-uci set homeproxy.dns_china.outbound='direct-out'
+set homeproxy.dns_china=dns_server
+set homeproxy.dns_china.enabled='1'
+set homeproxy.dns_china.label='China DNS'
+set homeproxy.dns_china.type='udp'
+set homeproxy.dns_china.server='119.29.29.29'
+set homeproxy.dns_china.address_resolver='default-dns'
+set homeproxy.dns_china.address_strategy='prefer_ipv6'
+set homeproxy.dns_china.outbound='direct-out'
 
 # 3. DNS 规则（geosite-cn → china-dns）
-uci set homeproxy.dnsrule_cn=dns_rule
-uci set homeproxy.dnsrule_cn.enabled='1'
-uci set homeproxy.dnsrule_cn.label='CN DNS Route'
-uci add_list homeproxy.dnsrule_cn.rule_set='rs_geosite_cn'
-uci set homeproxy.dnsrule_cn.action='route'
-uci set homeproxy.dnsrule_cn.server='dns_china'
-uci set homeproxy.dnsrule_cn.domain_strategy='prefer_ipv6'
+set homeproxy.dnsrule_cn=dns_rule
+set homeproxy.dnsrule_cn.enabled='1'
+set homeproxy.dnsrule_cn.label='CN DNS Route'
+add_list homeproxy.dnsrule_cn.rule_set='rs_geosite_cn'
+set homeproxy.dnsrule_cn.action='route'
+set homeproxy.dnsrule_cn.server='dns_china'
+set homeproxy.dnsrule_cn.domain_strategy='prefer_ipv6'
 
 # 4. 逻辑 AND DNS 规则（需要 custom-mode-logical-rules 特性）
-# 子规则1: NOT geosite-noncn
-uci set homeproxy.dnsrule_noncn=dns_rule
-uci set homeproxy.dnsrule_noncn.enabled='1'
-uci set homeproxy.dnsrule_noncn.label='Not CN'
-uci add_list homeproxy.dnsrule_noncn.rule_set='rs_geosite_noncn'
-uci set homeproxy.dnsrule_noncn.invert='1'
+set homeproxy.dnsrule_noncn=dns_rule
+set homeproxy.dnsrule_noncn.enabled='1'
+set homeproxy.dnsrule_noncn.label='Not CN'
+add_list homeproxy.dnsrule_noncn.rule_set='rs_geosite_noncn'
+set homeproxy.dnsrule_noncn.invert='1'
 
-# 子规则2: geoip-cn
-uci set homeproxy.dnsrule_cnip=dns_rule
-uci set homeproxy.dnsrule_cnip.enabled='1'
-uci set homeproxy.dnsrule_cnip.label='CN IP'
-uci add_list homeproxy.dnsrule_cnip.rule_set='rs_geoip_cn'
+set homeproxy.dnsrule_cnip=dns_rule
+set homeproxy.dnsrule_cnip.enabled='1'
+set homeproxy.dnsrule_cnip.label='CN IP'
+add_list homeproxy.dnsrule_cnip.rule_set='rs_geoip_cn'
 
-# 逻辑规则: AND 组合
-uci set homeproxy.dnsrule_logical=dns_rule
-uci set homeproxy.dnsrule_logical.enabled='1'
-uci set homeproxy.dnsrule_logical.label='Logical AND CN'
-uci set homeproxy.dnsrule_logical.rule_type='logical'
-uci set homeproxy.dnsrule_logical.logical_mode='and'
-uci add_list homeproxy.dnsrule_logical.logical_rules='dnsrule_noncn'
-uci add_list homeproxy.dnsrule_logical.logical_rules='dnsrule_cnip'
-uci set homeproxy.dnsrule_logical.action='route'
-uci set homeproxy.dnsrule_logical.server='dns_china'
-uci set homeproxy.dnsrule_logical.domain_strategy='prefer_ipv6'
+set homeproxy.dnsrule_logical=dns_rule
+set homeproxy.dnsrule_logical.enabled='1'
+set homeproxy.dnsrule_logical.label='Logical AND CN'
+set homeproxy.dnsrule_logical.rule_type='logical'
+set homeproxy.dnsrule_logical.logical_mode='and'
+add_list homeproxy.dnsrule_logical.logical_rules='dnsrule_noncn'
+add_list homeproxy.dnsrule_logical.logical_rules='dnsrule_cnip'
+set homeproxy.dnsrule_logical.action='route'
+set homeproxy.dnsrule_logical.server='dns_china'
+set homeproxy.dnsrule_logical.domain_strategy='prefer_ipv6'
 
 # 5. 路由节点（包装主节点）
-uci set homeproxy.rnode_main=routing_node
-uci set homeproxy.rnode_main.enabled='1'
-uci set homeproxy.rnode_main.label='Main Outbound'
-uci set homeproxy.rnode_main.node='<your-main-node-section>'
-uci set homeproxy.rnode_main.outbound='direct-out'
+set homeproxy.rnode_main=routing_node
+set homeproxy.rnode_main.enabled='1'
+set homeproxy.rnode_main.label='Main Outbound'
+set homeproxy.rnode_main.node='<your-main-node-section>'
+set homeproxy.rnode_main.outbound='direct-out'
 
 # 6. 规则集（geoip-cn, geosite-cn, geosite-noncn）
-uci set homeproxy.rs_geoip_cn=ruleset
-uci set homeproxy.rs_geoip_cn.enabled='1'
-uci set homeproxy.rs_geoip_cn.label='GeoIP CN'
-uci set homeproxy.rs_geoip_cn.type='remote'
-uci set homeproxy.rs_geoip_cn.format='binary'
-uci set homeproxy.rs_geoip_cn.url='https://fastly.jsdelivr.net/gh/1715173329/IPCIDR-CHINA@rule-set/cn.srs'
-uci set homeproxy.rs_geoip_cn.outbound='rnode_main'
+set homeproxy.rs_geoip_cn=ruleset
+set homeproxy.rs_geoip_cn.enabled='1'
+set homeproxy.rs_geoip_cn.label='GeoIP CN'
+set homeproxy.rs_geoip_cn.type='remote'
+set homeproxy.rs_geoip_cn.format='binary'
+set homeproxy.rs_geoip_cn.url='https://fastly.jsdelivr.net/gh/1715173329/IPCIDR-CHINA@rule-set/cn.srs'
+set homeproxy.rs_geoip_cn.outbound='rnode_main'
 
-uci set homeproxy.rs_geosite_cn=ruleset
-uci set homeproxy.rs_geosite_cn.enabled='1'
-uci set homeproxy.rs_geosite_cn.label='GeoSite CN'
-uci set homeproxy.rs_geosite_cn.type='remote'
-uci set homeproxy.rs_geosite_cn.format='binary'
-uci set homeproxy.rs_geosite_cn.url='https://fastly.jsdelivr.net/gh/1715173329/sing-geosite@rule-set-unstable/geosite-geolocation-cn.srs'
-uci set homeproxy.rs_geosite_cn.outbound='rnode_main'
+set homeproxy.rs_geosite_cn=ruleset
+set homeproxy.rs_geosite_cn.enabled='1'
+set homeproxy.rs_geosite_cn.label='GeoSite CN'
+set homeproxy.rs_geosite_cn.type='remote'
+set homeproxy.rs_geosite_cn.format='binary'
+set homeproxy.rs_geosite_cn.url='https://fastly.jsdelivr.net/gh/1715173329/sing-geosite@rule-set-unstable/geosite-geolocation-cn.srs'
+set homeproxy.rs_geosite_cn.outbound='rnode_main'
 
-uci set homeproxy.rs_geosite_noncn=ruleset
-uci set homeproxy.rs_geosite_noncn.enabled='1'
-uci set homeproxy.rs_geosite_noncn.label='GeoSite !CN'
-uci set homeproxy.rs_geosite_noncn.type='remote'
-uci set homeproxy.rs_geosite_noncn.format='binary'
-uci set homeproxy.rs_geosite_noncn.url='https://fastly.jsdelivr.net/gh/1715173329/sing-geosite@rule-set-unstable/geosite-geolocation-!cn.srs'
-uci set homeproxy.rs_geosite_noncn.outbound='rnode_main'
+set homeproxy.rs_geosite_noncn=ruleset
+set homeproxy.rs_geosite_noncn.enabled='1'
+set homeproxy.rs_geosite_noncn.label='GeoSite !CN'
+set homeproxy.rs_geosite_noncn.type='remote'
+set homeproxy.rs_geosite_noncn.format='binary'
+set homeproxy.rs_geosite_noncn.url='https://fastly.jsdelivr.net/gh/1715173329/sing-geosite@rule-set-unstable/geosite-geolocation-!cn.srs'
+set homeproxy.rs_geosite_noncn.outbound='rnode_main'
 
-# 7. 提交并重启
-uci commit homeproxy
+commit
+EOF
 /etc/init.d/homeproxy restart
 ```
 
@@ -143,32 +141,34 @@ uci commit homeproxy
 #### 配置
 
 ```bash
+uci batch <<EOF
 # 1. DNS 劫持：example.com → 1.2.3.4
-uci set homeproxy.dnsrule_target=dns_rule
-uci set homeproxy.dnsrule_target.enabled='1'
-uci set homeproxy.dnsrule_target.label='example.com → 1.2.3.4'
-uci add_list homeproxy.dnsrule_target.domain='example.com'
-uci set homeproxy.dnsrule_target.action='predefined'
-uci set homeproxy.dnsrule_target.predefined_rcode='NOERROR'
-uci add_list homeproxy.dnsrule_target.predefined_answer='example.com. 300 IN A 1.2.3.4'
+set homeproxy.dnsrule_target=dns_rule
+set homeproxy.dnsrule_target.enabled='1'
+set homeproxy.dnsrule_target.label='example.com → 1.2.3.4'
+add_list homeproxy.dnsrule_target.domain='example.com'
+set homeproxy.dnsrule_target.action='predefined'
+set homeproxy.dnsrule_target.predefined_rcode='NOERROR'
+add_list homeproxy.dnsrule_target.predefined_answer='example.com. 300 IN A 1.2.3.4'
 
 # 2. VLESS 路由节点（选择你的 VLESS 节点）
-uci set homeproxy.rnode_vless=routing_node
-uci set homeproxy.rnode_vless.enabled='1'
-uci set homeproxy.rnode_vless.label='VLESS Node'
-uci set homeproxy.rnode_vless.node='<your-vless-node-section>'
-uci set homeproxy.rnode_vless.outbound='direct-out'
+set homeproxy.rnode_vless=routing_node
+set homeproxy.rnode_vless.enabled='1'
+set homeproxy.rnode_vless.label='VLESS Node'
+set homeproxy.rnode_vless.node='<your-vless-node-section>'
+set homeproxy.rnode_vless.outbound='direct-out'
 
 # 3. 路由规则：匹配 example.com → VLESS 代理 + 改写地址
-uci set homeproxy.route_target=routing_rule
-uci set homeproxy.route_target.enabled='1'
-uci set homeproxy.route_target.label='example.com via VLESS'
-uci add_list homeproxy.route_target.domain='example.com'
-uci set homeproxy.route_target.action='route'
-uci set homeproxy.route_target.outbound='rnode_vless'
-uci set homeproxy.route_target.override_address='1.2.3.4'
+set homeproxy.route_target=routing_rule
+set homeproxy.route_target.enabled='1'
+set homeproxy.route_target.label='example.com via VLESS'
+add_list homeproxy.route_target.domain='example.com'
+set homeproxy.route_target.action='route'
+set homeproxy.route_target.outbound='rnode_vless'
+set homeproxy.route_target.override_address='1.2.3.4'
 
-uci commit homeproxy
+commit
+EOF
 /etc/init.d/homeproxy restart
 ```
 
