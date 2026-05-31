@@ -538,8 +538,21 @@ if (!isEmpty(main_node)) {
 	});
 
 	/* DNS rules */
+	let logical_sub_rules = {};
+	uci.foreach(uciconfig, ucidnsrule, (cfg) => {
+		if (cfg.rule_type === 'logical') {
+			let refs = cfg.logical_rules || [];
+			for (let name in refs)
+				if (!isEmpty(name))
+					logical_sub_rules[name] = true;
+		}
+	});
+
 	uci.foreach(uciconfig, ucidnsrule, (cfg) => {
 		if (cfg.enabled !== '1')
+			return;
+
+		if (logical_sub_rules[cfg['.name']])
 			return;
 
 		if (cfg.rule_type === 'logical') {
