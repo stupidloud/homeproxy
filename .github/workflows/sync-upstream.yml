@@ -11,6 +11,10 @@ on:
         default: 'master'
         type: string
 
+permissions:
+  contents: write
+  issues: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest
